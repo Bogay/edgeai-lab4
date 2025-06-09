@@ -1,10 +1,10 @@
-use hound::{WavReader, WavSpec};
+use hound::WavReader;
 use indicatif::{ProgressBar, ProgressStyle};
+use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType};
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters}; // For reading raw audio data from Common Voice if you manually download it
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 // Custom error type for better error handling
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -63,6 +63,13 @@ fn load_wav_to_f32(path: &Path) -> Result<Vec<f32>> {
     let reader = WavReader::open(path)?;
     let spec = reader.spec();
 
+    // Convert i16 samples (typical WAV format) to f32, normalizing to -1.0 to 1.0
+    // This is the format whisper.cpp's `full` method expects.
+    let samples: Vec<f32> = reader
+        .into_samples::<i16>()
+        .map(|s| s.map(|val| val as f32 / 32768.0).unwrap_or(0.0)) // Handle potential sample read errors
+        .collect();
+
     // Check if the audio meets Whisper's expectations (16kHz, mono)
     if spec.sample_rate != 16000 || spec.channels != 1 {
         eprintln!(
@@ -72,14 +79,33 @@ fn load_wav_to_f32(path: &Path) -> Result<Vec<f32>> {
         );
         // For a robust application, you'd integrate a resampling library here
         // (e.g., `rubato`). For this benchmark, we proceed as is.
+        // let params = SincInterpolationParameters {
+        //     sinc_len: 256,
+        //     f_cutoff: 0.95,
+        //     interpolation: SincInterpolationType::Linear,
+        //     oversampling_factor: 256,
+        //     window: rubato::WindowFunction::BlackmanHarris,
+        // };
+        // let channels = 1;
+        // let f_ratio = 16000f64 / spec.sample_rate as f64;
+        // let mut resampler = SincFixedIn::<f32>::new(f_ratio, 1.1, params, 1024, channels).unwrap();
+
+        // // Prepare
+        // let mut input_frames_next = resampler.input_frames_next();
+        // // let resampler_delay = resampler.output_delay();
+        // let mut outbuffer = vec![vec![0.0f32; resampler.output_frames_max()]; channels];
+        // let indata_slices = vec![&samples];
+        // while indata_slices[0].len() >= input_frames_next {
+        //     resampler.process_into_buffer(&indata_slices, &mut outbuffer, None)?;
+        //     input_frames_next = resampler.input_frames_next();
+        // }
+
+        // if !indata_slices[0].is_empty() {
+        //     resampler.process_into_buffer(&indata_slices, &mut outbuffer, None)?;
+        // }
+        // return Ok(outbuffer[0].clone());
     }
 
-    // Convert i16 samples (typical WAV format) to f32, normalizing to -1.0 to 1.0
-    // This is the format whisper.cpp's `full` method expects.
-    let samples: Vec<f32> = reader
-        .into_samples::<i16>()
-        .map(|s| s.map(|val| val as f32 / 32768.0).unwrap_or(0.0)) // Handle potential sample read errors
-        .collect();
     Ok(samples)
 }
 
@@ -93,28 +119,10 @@ fn main() -> Result<()> {
     //    Example: https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-base.bin
     // 2. Create a directory named `models` in your project root.
     // 3. Place the downloaded model file inside the `models` directory.
-    let model_path = "models/ggml-tiny.en.bin";
-
-    // --- Prepare your audio data ---
-    // For a real benchmark, you need to:
-    // 1. Download a subset of the "zh-TW" test split from the `mozilla-foundation/common_voice_16_1`
-    //    dataset. You can do this using the Python `datasets` library or manually.
-    // 2. Extract the audio files into a directory named `audio` in your project root.
-    //    Ensure they are `.wav` files and ideally 16kHz mono.
-    // 3. Create a text file named `references.txt` in your project root.
-    //    Each line in this file should contain the reference (ground truth) sentence
-    //    for the corresponding audio file, in the same order as the audio files are
-    //    processed (e.g., sorted alphabetically by filename).
-    //    The Python script uses the first 500 samples, so aim for that many.
-    //
-    // For demonstration purposes, if 'audio/' or 'references.txt' are not found,
-    // the script will try to use placeholder data. This placeholder data requires
-    // dummy WAV files to exist for the code to run.
-    let mut audio_samples: Vec<(PathBuf, String)> = Vec::new();
+    let model_path = "models/ggml-tiny.bin";
 
     let audio_dir = Path::new("audio");
     let references_file = Path::new("references.txt");
-
     if !audio_dir.exists() || !references_file.exists() {
         return Err("'audio/' directory or 'references.txt' not found.")?;
     }
@@ -123,6 +131,7 @@ fn main() -> Result<()> {
     let refs_content = fs::read_to_string(references_file)?;
     let references: Vec<String> = refs_content.lines().map(|s| s.to_string()).collect();
 
+    let mut audio_samples: Vec<(PathBuf, String)> = Vec::new();
     let mut audio_files: Vec<PathBuf> = fs::read_dir(audio_dir)?
         .filter_map(|entry| {
             let path = entry.ok()?.path();
@@ -134,7 +143,6 @@ fn main() -> Result<()> {
         })
         .collect();
     audio_files.sort(); // Ensure consistent order, important for matching with references
-
     for (i, audio_path) in audio_files.iter().enumerate() {
         if let Some(reference) = references.get(i) {
             audio_samples.push((audio_path.clone(), reference.clone()));
@@ -145,7 +153,6 @@ fn main() -> Result<()> {
             );
         }
     }
-
     if audio_samples.is_empty() {
         return Err("No valid audio files and references found for benchmarking. Please ensure data is prepared correctly or dummy WAVs exist.".into());
     }
@@ -249,12 +256,11 @@ fn main() -> Result<()> {
         pb_asr.inc(1);
         pb_asr.set_message(format!("Processed sample {}...", i + 1));
         // You can uncomment the line below for real-time output similar to Python's print
-        // println!("{reference_text} - {hypothesis}");
+        println!("{reference_text} - {hypothesis}");
     }
     pb_asr.finish_with_message("ASR processing complete.");
 
-    let end_time = Instant::now();
-    let duration = (end_time - start_time).as_secs_f64();
+    let duration = start_time.elapsed().as_secs_f64();
 
     // --- Calculate CER and Speed ---
     let total_cer_sum: f64 = all_references

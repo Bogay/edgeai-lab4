@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 hound = "3.5.1"
 indicatif = "0.17.11"
+rubato = "0.16.2"
 whisper-rs = "0.14.3"
