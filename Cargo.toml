@@ -1,0 +1,9 @@
+[package]
+name = "lab4-stt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hound = "3.5.1"
+indicatif = "0.17.11"
+whisper-rs = "0.14.3"
