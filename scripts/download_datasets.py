@@ -1,5 +1,8 @@
 import os
+import shutil
 import soundfile as sf
+import torchaudio
+from subprocess import check_call
 from datasets import load_dataset
 from tqdm import tqdm
 
@@ -19,24 +22,15 @@ if __name__ == "__main__":
     references = []
     print(f"Saving audio files to '{audio_dir}/' and references to '{references_file}'...")
     for i, sample in enumerate(tqdm(dataset)):
-        audio_data = sample["audio"]["array"]
-        sampling_rate = sample["audio"]["sampling_rate"]
         sentence = sample["sentence"]
-
-
         audio_path = os.path.join(audio_dir, f"audio_{i:04}.wav")
-        
-        # Ensure audio is 16kHz mono, as expected by Whisper
-        # `soundfile.write` can handle resampling if needed, but it's better to ensure consistency.
-        if sampling_rate != 16000:
-            print(f"Warning: Audio sample {i} has sample rate {sampling_rate}, expected 16000. This might impact performance.")
-            # For robustness, you might want to resample explicitly here
-            # Example: resampled_audio = librosa.resample(audio_data, orig_sr=sampling_rate, target_sr=16000)
-            # For simplicity, we'll write directly and trust Whisper.cpp's handling.
-        
-        # Save audio as WAV (16-bit PCM, mono)
-        # `soundfile` by default handles conversion from float array to WAV's int16
-        sf.write(audio_path, audio_data, 16000, subtype='PCM_16') 
+        raw_audio = sf.read(sample["audio"]["path"])[0]
+        if sample["audio"]["sampling_rate"] != 16000:
+            waveform, _ = torchaudio.load(sample["audio"]["path"])
+            waveform = torchaudio.transforms.Resample(orig_freq=sample["audio"]["sampling_rate"], new_freq=16000)(waveform)
+            raw_audio = waveform.numpy()[0]
+
+        sf.write(audio_path, raw_audio, 16000, format='WAV')
         references.append(sentence)
 
     with open(references_file, "w", encoding="utf-8") as f:
@@ -44,5 +38,3 @@ if __name__ == "__main__":
             f.write(ref + "\n")
 
     print("\nCommon Voice dataset setup complete.")
-
-

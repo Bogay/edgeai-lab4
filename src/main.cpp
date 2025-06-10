@@ -163,6 +163,7 @@ int main(int argc, char **argv) {
       whisper_free(ctx);
       return 1;
     }
+    auto ends_at = std::chrono::high_resolution_clock::now();
     
     const int n_segments = whisper_full_n_segments(ctx);
     std::string output = "";
@@ -175,7 +176,6 @@ int main(int argc, char **argv) {
       //        to_timestamp(t1).c_str(), text);
       output += text;
     }
-    auto ends_at = std::chrono::high_resolution_clock::now();
     auto elapsed = ends_at - starts_at;
     double elapsed_secs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() / 1000.;
     std::cout << duration << "\t" << elapsed_secs << "\t" << ref << "\t" << output << "\n";
