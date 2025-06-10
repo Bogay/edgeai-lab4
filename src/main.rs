@@ -245,7 +245,7 @@ fn main() -> Result<()> {
         let hypothesis = (0..num_segments)
             .map(|i| {
                 state
-                    .full_get_segment_text(i)
+                    .full_get_segment_text_lossy(i)
                     .expect("failed to get segment")
             })
             .collect::<Vec<_>>()
