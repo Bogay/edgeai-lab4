@@ -1,7 +1,7 @@
 import io
 import sys
 import time
-from jiwer import wer
+from jiwer import cer
 from tqdm import tqdm
 from dataclasses import dataclass
 
@@ -32,10 +32,10 @@ if __name__ == "__main__":
     total_audio_duration = sum(r.audio_duration for r in rows)
     total_inference_duration = sum(r.inference_duration for r in rows)
     
-    error = wer(references, predictions)
+    error = cer(references, predictions)
     rtime_factor = total_inference_duration / total_audio_duration
 
-    print(f"WER: {error:.4f}")
+    print(f"CER: {error:.4f}")
     print(f"Total time: {total_inference_duration:.2f} sec")
     print(f"Real-time factor (RTF): {rtime_factor:.4f}")
 

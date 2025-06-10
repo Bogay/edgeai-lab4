@@ -134,6 +134,7 @@ int main(int argc, char **argv) {
       std::filesystem::directory_iterator(params.audio_dir),
       std::filesystem::directory_iterator());
   std::sort(audio_files.begin(), audio_files.end());
+  audio_files.erase(audio_files.begin() + 20, audio_files.end());
 
   for (const auto &e : audio_files) {
     const auto& audio_path = e.path();
