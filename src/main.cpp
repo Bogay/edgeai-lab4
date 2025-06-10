@@ -134,7 +134,25 @@ int main(int argc, char **argv) {
       std::filesystem::directory_iterator(params.audio_dir),
       std::filesystem::directory_iterator());
   std::sort(audio_files.begin(), audio_files.end());
-  audio_files.erase(audio_files.begin() + 20, audio_files.end());
+  audio_files.erase(audio_files.begin() + 100, audio_files.end());
+
+  // warmup
+  std::cerr << "Starting warmup...\n";
+  for(int i=0 ; i<3 ; i++) {
+    const auto& audio_path = audio_files[0].path();
+    std::vector<float> pcmf32;
+    std::vector<std::vector<float>> pcmf32s;
+    if (!read_audio_data(audio_path, pcmf32, pcmf32s, false)) {
+      std::cerr << "Error: cannot read audio file: " << audio_path
+                << "\n";
+      return 1;
+    }
+    if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
+      std::cerr << "Error: failed to process audio\n";
+      whisper_free(ctx);
+      return 1;
+    }
+  }
 
   for (const auto &e : audio_files) {
     const auto& audio_path = e.path();
