@@ -1,9 +1,16 @@
 # rust
 /target
 
+build/
+
 # datasets
 audio/
 references.txt
 
 hf_token
 models/
+
+.cache/
+
+*.wav
+*.mp3

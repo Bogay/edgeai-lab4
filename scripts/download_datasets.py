@@ -23,6 +23,7 @@ if __name__ == "__main__":
         sampling_rate = sample["audio"]["sampling_rate"]
         sentence = sample["sentence"]
 
+
         audio_path = os.path.join(audio_dir, f"audio_{i:04}.wav")
         
         # Ensure audio is 16kHz mono, as expected by Whisper
