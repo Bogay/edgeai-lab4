@@ -18,8 +18,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(whisper_cpp)
 
 add_executable(my_whisper_app src/main.cpp src/common-whisper.cpp src/common.cpp)
+add_executable(bench src/bench.cpp src/common-whisper.cpp src/common.cpp)
 
 target_link_libraries(my_whisper_app PRIVATE whisper)
+target_link_libraries(bench PRIVATE whisper)
 
 # (Optional) If you want to enable specific whisper.cpp build options
 # For example, to enable BLAS for potentially better CPU performance on RPi

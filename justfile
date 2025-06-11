@@ -1,12 +1,14 @@
 bin := "./build/my_whisper_app"
+gen_flags := ("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+    )
+build_dir := "build"
 
 gen:
-    mkdir -p build
-    cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DGGML_BLAS=1 ..
+    cmake {{ gen_flags }} -B {{ build_dir }}
 
 alias b := build
 build: gen
-    cmake --build build --config Release
+    cmake --build {{ build_dir }} --config Release
 
 bench: build
     #!/usr/bin/env bash
@@ -15,5 +17,6 @@ bench: build
         {{ bin }} -l zh \
             $m audio references.txt > output_$v.txt
     done
-    
-    
+
+clean:
+    rm -rf {{ build_dir }}
